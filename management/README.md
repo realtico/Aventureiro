@@ -38,16 +38,22 @@ P0 (scaffold) → P1 (dados JSON) → P2 (types/util) → P3 (data_loader)
 |---|---|---|---|---|
 | 0 | [backlog/00-scaffold.md](backlog/00-scaffold.md) | S | — | [x] |
 | 1 | [backlog/01-dados-json.md](backlog/01-dados-json.md) | S | — | [x] |
-| 2 | [backlog/02-types-util.md](backlog/02-types-util.md) | S | — | [ ] |
-| 3 | [backlog/03-data-loader.md](backlog/03-data-loader.md) | M | P1, P2 | [ ] |
-| 4 | [backlog/04-map.md](backlog/04-map.md) | M | P2, P3 | [ ] |
-| 5 | [backlog/05-player.md](backlog/05-player.md) | S | P2, P4 | [ ] |
-| 6a | [backlog/06a-combat-basico.md](backlog/06a-combat-basico.md) | M | P4, P5 | [ ] |
-| 6b | [backlog/06b-combat-avancado.md](backlog/06b-combat-avancado.md) | M | P6a | [ ] |
+| 2 | [backlog/02-types-util.md](backlog/02-types-util.md) | S | — | [x] |
+| 3 | [backlog/03-data-loader.md](backlog/03-data-loader.md) | M | P1, P2 | [x] |
+| 4 | [backlog/04-map.md](backlog/04-map.md) | M | P2, P3 | [x] |
+| 5 | [backlog/05-player.md](backlog/05-player.md) | S | P2, P4 | [x] |
+| 6a | [backlog/06a-combat-basico.md](backlog/06a-combat-basico.md) | M | P4, P5 | [x] |
+| 6b | [backlog/06b-combat-avancado.md](backlog/06b-combat-avancado.md) | M | P6a | [x] |
 | 7 | [backlog/07-ui.md](backlog/07-ui.md) | M | P2 | [ ] |
 | 8 | [backlog/08-game.md](backlog/08-game.md) | M | P6b, P7 | [ ] |
 | 9 | [backlog/09-main-testes.md](backlog/09-main-testes.md) | M | P8 | [ ] |
 | 10 | [backlog/10-polimento.md](backlog/10-polimento.md) | S | P9 | [ ] |
+
+## Depois do backlog
+
+[ideias-futuras.md](ideias-futuras.md) — melhorias cogitadas para depois do Pacote 10 validado
+(grid maior, novos personagens/armas, mais aleatoriedade de dano, revelar mapa conhecido). Não
+mexer nisso antes da hora.
 
 ## Notas de execução
 

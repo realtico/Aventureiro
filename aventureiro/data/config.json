@@ -7,7 +7,7 @@
   "jogador": {
     "_comment": "Estado inicial do jogador ao nascer na Sala de Teleporte.",
     "vida_inicial": 20,
-    "energia_inicial": 100,
+    "energia_inicial": 200,
     "dinheiro_inicial": 0
   },
 
