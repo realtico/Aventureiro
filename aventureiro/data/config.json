@@ -2,7 +2,7 @@
   "_comment": "Todo valor de balanceamento do jogo vive aqui, nao em #define no C (ver Pacote 0 / secao 5.2 do handover). Mudar dificuldade e so editar este arquivo, sem recompilar.",
 
   "grid_size": 8,
-  "_comment_grid_size": "Lado do labirinto quadrado da nave (8x8, igual ao original). O gerador (map.c) garante conectividade total a partir da Sala de Teleporte.",
+  "_comment_grid_size": "Lado do labirinto quadrado da nave (8x8, igual ao original). O gerador (map.c) garante conectividade total a partir da Sala de Teleporte. Decisao do Pacote 0, CONFIRMADA como final no Pacote 10 (secao 7 do handover) - mudar aqui e' so trocar o numero, sem recompilar.",
 
   "jogador": {
     "_comment": "Estado inicial do jogador ao nascer na Sala de Teleporte.",

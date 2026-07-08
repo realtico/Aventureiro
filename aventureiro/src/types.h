@@ -123,7 +123,9 @@ typedef struct {
     int num_armas_obtidas;
     int arma_atual; /* indice dentro de armas_obtidas, nao em BaseDeDados::armas */
 
-    bool tem_medicamento;
+    /* Quantidade de medicamentos (nao e' um bool - o original acumula
+     * varios via loot, linhas 1850/5340; ver Pacote 12). */
+    int num_medicamentos;
     bool escudo_ligado;
 } Jogador;
 

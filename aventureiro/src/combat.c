@@ -14,6 +14,57 @@
 /* Drenagem de energia do escudo por sala percorrida, linha 3600 do original. */
 #define CUSTO_ENERGIA_ESCUDO_POR_SALA 2
 
+/* Chance (%) de tropecar e cair ao tentar fugir, linha 2040 do original
+ * ("IF RND>.1 THEN GOTO 2048" - so 10% cai, os outros 90% fogem). */
+#define CHANCE_FUGIR_SUCESSO 90
+
+/* Chance (%) de o tripulante em panico escapar mesmo assim, linha 6801
+ * ("IF RND>.33 THEN GOTO 6810" - 67% foge, 33% cai na tentativa). */
+#define CHANCE_PANICO_ESCAPAR 67
+
+/* Chance (%) de sortear um medicamento extra ao saquear o corpo de um
+ * tripulante agressivo morto, linha 1830 do original ("IF RND>.2 THEN
+ * GOTO 1860" - 20% ganha medicamento). */
+#define CHANCE_LOOT_MEDICAMENTO 20
+
+/* Chance (%) de sortear dinheiro extra ao saquear o corpo, linha 1860 do
+ * original ("IF RND>.7 THEN GOTO 1900" - 70% ganha dinheiro, nao 30%). */
+#define CHANCE_LOOT_DINHEIRO 70
+
+/* Faixa de dinheiro (A$) saqueada do corpo, linha 1870 do original
+ * ("INT(RND*200+50)" = 50 a 249). */
+#define DINHEIRO_MINIMO_LOOT 50
+#define DINHEIRO_MAXIMO_LOOT 249
+
+/* Item encontrado ao examinar a sala (linha 5240-5390 do original) - ver
+ * uso em comando_examinar_sala para o porque de cada limiar. */
+#define ENERGIA_CARGA 100
+#define ENERGIA_CARGA_LIMIAR_UMA 0.5
+#define ENERGIA_CARGA_LIMIAR_DUAS 0.2
+#define MEDICAMENTO_ITEM_LIMIAR_UM 0.4
+#define MEDICAMENTO_ITEM_LIMIAR_DOIS 0.15
+#define DINHEIRO_BASE_ITEM_SALA 50
+#define DINHEIRO_FATOR_ITEM_SALA 2000
+
+/* Limiar de suborno: aceita se a oferta superar um sorteio em [0,999],
+ * linha 3190 do original ("IF X>RND*1E3 THEN GOTO 3220"). */
+#define SUBORNO_LIMIAR_MAXIMO 999
+
+/* Chance (%) de o tripulante irritado escorregar e ir embora, linha 3270
+ * do original ("IF RND<.2 THEN GOTO 3300"). */
+#define CHANCE_IRRITAR_SUCESSO 20
+
+/* Chance (%) de o tripulante ficar amigavel por sorte (alem do caso de
+ * vida baixa abaixo), linha 3330 do original ("IF RND<.09 OR MBP<2 THEN
+ * GOTO 3360"). */
+#define CHANCE_AMIGAVEL_SUCESSO 9
+#define VIDA_AMIGAVEL_GARANTIDO 2
+
+/* Faixa de dinheiro dado pelo tripulante amigavel, linha 3360 do original
+ * ("INT(RND*250+1)" = 1 a 250). */
+#define DINHEIRO_MINIMO_AMIGAVEL 1
+#define DINHEIRO_MAXIMO_AMIGAVEL 250
+
 /* Indexados por int (nao Direcao) de proposito - ver aviso do handover
  * (secao 6) sobre -Warray-bounds do GCC com enum usado como indice apos
  * inlining em -O2, mesmo padrao adotado em map.c. */
@@ -60,12 +111,14 @@ static void acidente_no_escuro(Jogador *jogador, Resultado *r) {
     }
 }
 
-/* Entrar em sala nova (linha 6002): narra tipo de sala, saidas e presenca
- * de tripulante; drena energia do escudo se ligado (linha 6115 + 3600). */
-static void entrar_em_sala(Jogador *jogador, const Mapa *mapa, const BaseDeDados *bd, Resultado *r) {
-    log_msg(r, "Voce entrou numa nova sala.");
-
-    const Celula *celula = &mapa->celulas[jogador->linha][jogador->coluna];
+/*
+ * Descreve tipo de sala/saidas/tripulante da celula em (linha, coluna) -
+ * conteudo compartilhado entre "entrar em sala nova" (abaixo) e o comando
+ * Examinar interativo (Pacote 11, game.c), que repete a mesma narracao
+ * antes do resultado da busca.
+ */
+static void narrar_sala(const Mapa *mapa, const BaseDeDados *bd, int linha, int coluna, Resultado *r) {
+    const Celula *celula = &mapa->celulas[linha][coluna];
     const TipoSala *tipo = &bd->salas[celula->id_tipo_sala];
     log_msg(r, "Sala tipo: %s", tipo->nome);
 
@@ -91,6 +144,17 @@ static void entrar_em_sala(Jogador *jogador, const Mapa *mapa, const BaseDeDados
     } else {
         log_msg(r, "Nao ha ninguem aqui.");
     }
+}
+
+void combat_narrar_sala_atual(const Jogador *jogador, const Mapa *mapa, const BaseDeDados *bd, Resultado *r) {
+    narrar_sala(mapa, bd, jogador->linha, jogador->coluna, r);
+}
+
+/* Entrar em sala nova (linha 6002): narra tipo de sala, saidas e presenca
+ * de tripulante; drena energia do escudo se ligado (linha 6115 + 3600). */
+static void entrar_em_sala(Jogador *jogador, const Mapa *mapa, const BaseDeDados *bd, Resultado *r) {
+    log_msg(r, "Voce entrou numa nova sala.");
+    narrar_sala(mapa, bd, jogador->linha, jogador->coluna, r);
 
     if (jogador->escudo_ligado) {
         jogador->energia -= CUSTO_ENERGIA_ESCUDO_POR_SALA;
@@ -131,7 +195,7 @@ static void reacao_tripulante_apos_turno(Jogador *jogador, Celula *celula, const
 
     if (!tripulante->agressivo) {
         log_msg(r, "O %s entra em panico.", tripulante->nome);
-        if (!sorteio_chance(67)) {
+        if (!sorteio_chance(CHANCE_PANICO_ESCAPAR)) {
             log_msg(r, "E na tentativa de fugir, cai.");
             return;
         }
@@ -150,7 +214,10 @@ static void reacao_tripulante_apos_turno(Jogador *jogador, Celula *celula, const
 
     int dano = sorteio_intervalo(1, arma->dano_maximo);
     if (jogador->escudo_ligado) {
-        dano = dano / 3;
+        /* INT(X/3+0.7), linha 6590 do original: arredonda em vez de
+         * truncar (dano/3 puro subestimaria o dano reduzido). Em inteiros,
+         * INT(X/3+0.7) = INT((10X+21)/30). */
+        dano = (dano * 10 + 21) / 30;
         jogador->energia -= dano * 5;
         desligar_escudo_se_sem_energia(jogador, r);
         if (dano == 0) {
@@ -226,12 +293,14 @@ Resultado comando_escudo(Jogador *jogador) {
     return r;
 }
 
-Resultado comando_usar_medicamento(Jogador *jogador, const Config *cfg) {
+Resultado comando_usar_medicamento(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const Config *cfg) {
     Resultado r = resultado_vazio();
-    bool tinha_medicamento = jogador->tem_medicamento;
+    bool tinha_medicamento = jogador->num_medicamentos > 0;
 
     if (jogador_usar_medicamento(jogador, cfg->vida_inicial)) {
         log_msg(&r, "Sente-se melhor? Voce agora tem %d pontos de vida.", jogador->vida);
+        Celula *celula = &mapa->celulas[jogador->linha][jogador->coluna];
+        reacao_tripulante_apos_turno(jogador, celula, bd, &r);
         return r;
     }
 
@@ -249,7 +318,7 @@ Resultado comando_situacao(const Jogador *jogador, const BaseDeDados *bd) {
 
     log_msg(&r, "Situacao");
     log_msg(&r, "Vida: %d", jogador->vida);
-    log_msg(&r, "Medicamento: %s", jogador->tem_medicamento ? "sim" : "nao");
+    log_msg(&r, "Medicamentos: %d", jogador->num_medicamentos);
     log_msg(&r, "Energia: %d", jogador->energia);
     log_msg(&r, "Dinheiro: %d", jogador->dinheiro);
     log_msg(&r, "Armas: %d", jogador->num_armas_obtidas);
@@ -300,17 +369,37 @@ Resultado comando_examinar_sala(Jogador *jogador, Mapa *mapa, const Config *cfg,
         return r;
     }
 
-    celula->item_coletado = true;
+    /*
+     * O original (linha 5220 em diante) guarda o tipo de item por sala
+     * desde a geracao do mapa (um char P/M/E fixo por sala). O mapa
+     * (Pacote 4) ja simplifica presenca de item para um bool sem tipo
+     * pre-definido (ver combat.h) - aqui sorteamos o tipo com peso
+     * uniforme (1/3 cada), mas as quantidades/valores dentro de cada tipo
+     * abaixo replicam o viés exato do original (Pacote 12).
+     */
     int tipo = sorteio_intervalo(0, 2);
     if (tipo == 0) {
-        int energia = sorteio_intervalo(1, 3) * 100;
+        /* Cargas de energia, linha 5260-5270: "X=RND"; 1 carga (50%,
+         * X>.5), 2 cargas (30%, .2<=X<=.5) ou 3 cargas (20%, X<.2), cada
+         * uma valendo 100. */
+        double x = sorteio_uniforme();
+        int cargas = (x > ENERGIA_CARGA_LIMIAR_UMA) ? 1 : (x >= ENERGIA_CARGA_LIMIAR_DUAS) ? 2 : 3;
+        int energia = cargas * ENERGIA_CARGA;
         jogador->energia += energia;
         log_msg(&r, "Cargas de energia: +%d.", energia);
     } else if (tipo == 1) {
-        jogador->tem_medicamento = true;
-        log_msg(&r, "Medicamento.");
+        /* Medicamentos, linha 5330-5340: "X=RND"; 1 (60%, X>.4), 2 (25%,
+         * .15<X<=.4) ou 3 (15%, X<=.15) de uma vez. */
+        double x = sorteio_uniforme();
+        int qtd = (x > MEDICAMENTO_ITEM_LIMIAR_UM) ? 1 : (x > MEDICAMENTO_ITEM_LIMIAR_DOIS) ? 2 : 3;
+        jogador->num_medicamentos += qtd;
+        log_msg(&r, "Medicamentos: +%d.", qtd);
     } else {
-        int dinheiro = sorteio_intervalo(50, 2000);
+        /* Dinheiro achado na sala, linha 5370: "INT(50+RND*RND*RND*2E3)" -
+         * cubo de RND enviesa fortemente para valores baixos dentro da
+         * faixa nominal 50 a 2050. */
+        double x = sorteio_uniforme();
+        int dinheiro = (int)(DINHEIRO_BASE_ITEM_SALA + x * x * x * DINHEIRO_FATOR_ITEM_SALA);
         jogador->dinheiro += dinheiro;
         log_msg(&r, "A$ %d.00", dinheiro);
     }
@@ -339,8 +428,7 @@ Resultado comando_acionar_teleporte(Jogador *jogador, const Mapa *mapa) {
 }
 
 /* Energia ganha ao saquear o corpo de um tripulante morto, linha 1750 do
- * original (o range exato la e' obscuro/parcialmente morto; usamos um
- * valor razoavel, ver handover secao 5.5). */
+ * original ("INT(RND*120+30)" = 30 a 149). */
 #define ENERGIA_MINIMA_LOOT 30
 #define ENERGIA_MAXIMA_LOOT 149
 
@@ -397,12 +485,12 @@ Resultado comando_atacar(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd) {
     /* Loot extra so para tripulantes agressivos (linha 1800: MI=1) -
      * os nao-agressivos (robots/serventes) nao carregam mais nada. */
     if (tripulante->agressivo) {
-        if (sorteio_chance(20)) {
-            jogador->tem_medicamento = true;
+        if (sorteio_chance(CHANCE_LOOT_MEDICAMENTO)) {
+            jogador->num_medicamentos++; /* linha 1850: "LET M=M+1" */
             log_msg(&r, "Tambem encontrou medicamentos.");
         }
-        if (sorteio_chance(30)) {
-            int dinheiro = sorteio_intervalo(50, 249);
+        if (sorteio_chance(CHANCE_LOOT_DINHEIRO)) {
+            int dinheiro = sorteio_intervalo(DINHEIRO_MINIMO_LOOT, DINHEIRO_MAXIMO_LOOT);
             jogador->dinheiro += dinheiro;
             log_msg(&r, "E A$ %d.00.", dinheiro);
         }
@@ -421,7 +509,7 @@ Resultado comando_fugir(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd) {
         return r;
     }
 
-    if (!sorteio_chance(90)) {
+    if (!sorteio_chance(CHANCE_FUGIR_SUCESSO)) {
         log_msg(&r, "Voce tenta fugir, mas cai.");
         reacao_tripulante_apos_turno(jogador, celula, bd, &r);
         r.sucesso = false;
@@ -476,7 +564,7 @@ Resultado comando_comunicar(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd,
                 return r;
             }
             log_msg(&r, "Esta pensando...");
-            if (valor_oferecido > sorteio_intervalo(0, 999)) {
+            if (valor_oferecido > sorteio_intervalo(0, SUBORNO_LIMIAR_MAXIMO)) {
                 jogador->dinheiro -= valor_oferecido;
                 log_msg(&r, "Aceita, deixando-o em paz.");
                 celula->tem_tripulante = false;
@@ -488,7 +576,7 @@ Resultado comando_comunicar(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd,
             return r;
 
         case COMUNICAR_IRRITAR:
-            if (sorteio_chance(20)) {
+            if (sorteio_chance(CHANCE_IRRITAR_SUCESSO)) {
                 log_msg(&r, "O %s escorrega e vai longe.", tripulante->nome);
                 celula->tem_tripulante = false;
                 return r;
@@ -499,8 +587,8 @@ Resultado comando_comunicar(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd,
             return r;
 
         case COMUNICAR_AMIGAVEL:
-            if (sorteio_chance(9) || celula->tripulante_vida_atual < 2) {
-                int dinheiro = sorteio_intervalo(1, 250);
+            if (sorteio_chance(CHANCE_AMIGAVEL_SUCESSO) || celula->tripulante_vida_atual < VIDA_AMIGAVEL_GARANTIDO) {
+                int dinheiro = sorteio_intervalo(DINHEIRO_MINIMO_AMIGAVEL, DINHEIRO_MAXIMO_AMIGAVEL);
                 jogador->dinheiro += dinheiro;
                 log_msg(&r, "O %s achou voce um cara legal, deu-lhe A$ %d.00 e foi embora.", tripulante->nome, dinheiro);
                 celula->tem_tripulante = false;

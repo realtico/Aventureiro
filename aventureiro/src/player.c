@@ -2,6 +2,14 @@
 
 #include <string.h>
 
+#include "util.h"
+
+/* Cura ao usar medicamento, linha 4070 do original: "BP+7+INT(RND*3+1)" -
+ * base fixa + 1 a 3 pontos, nunca a vida cheia de uma vez. */
+#define CURA_MEDICAMENTO_BASE 7
+#define CURA_MEDICAMENTO_VARIACAO_MINIMA 1
+#define CURA_MEDICAMENTO_VARIACAO_MAXIMA 3
+
 Jogador jogador_iniciar(const Config *cfg, const Mapa *mapa) {
     Jogador jogador;
     memset(&jogador, 0, sizeof(jogador));
@@ -17,7 +25,7 @@ Jogador jogador_iniciar(const Config *cfg, const Mapa *mapa) {
     jogador.arma_atual = 0;
     jogador_adicionar_arma(&jogador, 2); /* Pistola Laser - equivalente as linhas 330-370 do original */
 
-    jogador.tem_medicamento = false;
+    jogador.num_medicamentos = 0;
     jogador.escudo_ligado = false;
 
     return jogador;
@@ -46,10 +54,13 @@ bool jogador_trocar_arma(Jogador *jogador, int indice_no_inventario) {
 }
 
 bool jogador_usar_medicamento(Jogador *jogador, int vida_maxima) {
-    if (!jogador->tem_medicamento || jogador->vida >= vida_maxima) {
+    if (jogador->num_medicamentos <= 0 || jogador->vida >= vida_maxima) {
         return false;
     }
-    jogador->vida = vida_maxima;
-    jogador->tem_medicamento = false;
+    jogador->vida += CURA_MEDICAMENTO_BASE + sorteio_intervalo(CURA_MEDICAMENTO_VARIACAO_MINIMA, CURA_MEDICAMENTO_VARIACAO_MAXIMA);
+    if (jogador->vida > vida_maxima) {
+        jogador->vida = vida_maxima;
+    }
+    jogador->num_medicamentos--;
     return true;
 }

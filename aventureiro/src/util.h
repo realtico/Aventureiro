@@ -15,6 +15,18 @@ static inline int sorteio_intervalo(int minimo, int maximo) {
 }
 
 /*
+ * Sorteia um double em [0, 1) - equivalente a RND do ZX81. Usada onde o
+ * original tem uma formula com o valor bruto de RND (ex.: pesos nao
+ * uniformes de item na sala, linhas 5260-5270/5330-5340/5370 do original,
+ * ver Pacote 12) em vez de uma chance percentual simples ou um intervalo
+ * inteiro uniforme - os dois casos cobertos por sorteio_chance/
+ * sorteio_intervalo abaixo.
+ */
+static inline double sorteio_uniforme(void) {
+    return (double)rand() / ((double)RAND_MAX + 1.0);
+}
+
+/*
  * Retorna true com probabilidade 'percentual' em 100. Usada para todas as
  * chances de config.json (tripulante na sala, item na sala, acidente no
  * escuro, etc.) - centralizar aqui evita reimplementar rand()%100 espalhado

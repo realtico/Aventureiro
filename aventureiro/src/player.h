@@ -30,10 +30,12 @@ bool jogador_adicionar_arma(Jogador *jogador, int id_arma);
 bool jogador_trocar_arma(Jogador *jogador, int indice_no_inventario);
 
 /*
- * Usa o medicamento do jogador, recuperando vida ate 'vida_maxima'.
- * Equivalente a linha 4010 do original: so tem efeito (e so consome o
- * medicamento) se o jogador tiver um E nao estiver com vida cheia.
- * Retorna true se de fato curou.
+ * Usa um medicamento do jogador (se tiver algum e nao estiver com vida
+ * cheia - linha 4010/4040 do original). Cura 7 + [1,3] pontos (linha 4070:
+ * "BP=BP+7+INT(RND*3+1)"), nao a vida cheia de uma vez, respeitando o teto
+ * 'vida_maxima' (linha 4080: "IF BP>20 THEN LET BP=20"). Consome um
+ * medicamento do contador (linha 4095: "M=M-1"). Retorna true se de fato
+ * curou.
  */
 bool jogador_usar_medicamento(Jogador *jogador, int vida_maxima);
 

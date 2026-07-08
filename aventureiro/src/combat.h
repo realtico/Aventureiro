@@ -52,17 +52,28 @@ Resultado comando_trocar_arma(Jogador *jogador, const BaseDeDados *bd, int indic
 Resultado comando_escudo(Jogador *jogador);
 
 /*
- * Usar medicamento (linha 4010): fino wrapper sobre jogador_usar_medicamento
- * (Pacote 5) que so acrescenta a narracao (sem medicamento / vida ja cheia /
- * curou).
+ * Usar medicamento (linha 4010): wrapper sobre jogador_usar_medicamento
+ * (Pacote 5/12) que acrescenta a narracao (sem medicamento / vida ja cheia /
+ * curou). Curar com sucesso conta como uma rodada plena (linha 4100:
+ * "GOTO 6500") - se houver tripulante vivo na sala, ele reage exatamente
+ * como apos um ataque ou fuga, por isso a assinatura recebe 'mapa'/'bd'.
  */
-Resultado comando_usar_medicamento(Jogador *jogador, const Config *cfg);
+Resultado comando_usar_medicamento(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const Config *cfg);
 
 /*
  * Situacao (linha 4510): relatorio somente-leitura de vida, medicamento,
  * energia, dinheiro, armas e arma atual.
  */
 Resultado comando_situacao(const Jogador *jogador, const BaseDeDados *bd);
+
+/*
+ * Descreve tipo de sala/saidas/tripulante da sala atual do jogador, sem
+ * narrar "entrada" nem drenar escudo - e' o mesmo conteudo que "entrar em
+ * sala nova" (linha 6002) produz ao mover, exposto aqui para o comando
+ * Examinar (Pacote 11) reaproveitar em vez de o jogador precisar sair e
+ * voltar na sala so pra reler a descricao.
+ */
+void combat_narrar_sala_atual(const Jogador *jogador, const Mapa *mapa, const BaseDeDados *bd, Resultado *r);
 
 /*
  * Examinar a sala (linha 5001): falha se houver tripulante vivo na sala

@@ -30,6 +30,11 @@ P0 (scaffold) → P1 (dados JSON) → P2 (types/util) → P3 (data_loader)
                                                     P9 (main + testes)
                                                             ↓
                                                     P10 (polimento)
+                                                            ↓
+                              ┌──────────────┬──────────────┬──────────────┐
+                              ↓              ↓              ↓              ↓
+                        P11 (melhorias  P12 (formulas  P13 (persegui-  P14 (mapa
+                        de jogabilidade) restantes)     cao fiel)       ASCII)
 ```
 
 ## Pacotes
@@ -44,16 +49,19 @@ P0 (scaffold) → P1 (dados JSON) → P2 (types/util) → P3 (data_loader)
 | 5 | [backlog/05-player.md](backlog/05-player.md) | S | P2, P4 | [x] |
 | 6a | [backlog/06a-combat-basico.md](backlog/06a-combat-basico.md) | M | P4, P5 | [x] |
 | 6b | [backlog/06b-combat-avancado.md](backlog/06b-combat-avancado.md) | M | P6a | [x] |
-| 7 | [backlog/07-ui.md](backlog/07-ui.md) | M | P2 | [ ] |
-| 8 | [backlog/08-game.md](backlog/08-game.md) | M | P6b, P7 | [ ] |
-| 9 | [backlog/09-main-testes.md](backlog/09-main-testes.md) | M | P8 | [ ] |
-| 10 | [backlog/10-polimento.md](backlog/10-polimento.md) | S | P9 | [ ] |
+| 7 | [backlog/07-ui.md](backlog/07-ui.md) | M | P2 | [x] |
+| 8 | [backlog/08-game.md](backlog/08-game.md) | M | P6b, P7 | [x] |
+| 9 | [backlog/09-main-testes.md](backlog/09-main-testes.md) | M | P8 | [x] |
+| 10 | [backlog/10-polimento.md](backlog/10-polimento.md) | S | P9 | [x] |
+| 11 | [backlog/11-melhorias-jogabilidade.md](backlog/11-melhorias-jogabilidade.md) | S | P10 | [x] |
+| 12 | [backlog/12-fidelidade-formulas.md](backlog/12-fidelidade-formulas.md) | M | P10 | [x] |
+| 13 | [backlog/13-perseguicao-fiel.md](backlog/13-perseguicao-fiel.md) | M | P10 | [ ] |
+| 14 | [backlog/14-mapa-ascii.md](backlog/14-mapa-ascii.md) | S | P10 | [ ] |
 
 ## Depois do backlog
 
 [ideias-futuras.md](ideias-futuras.md) — melhorias cogitadas para depois do Pacote 10 validado
-(grid maior, novos personagens/armas, mais aleatoriedade de dano, revelar mapa conhecido). Não
-mexer nisso antes da hora.
+(grid maior, novos personagens/armas, mais aleatoriedade de dano). Não mexer nisso antes da hora.
 
 ## Notas de execução
 
@@ -61,4 +69,9 @@ mexer nisso antes da hora.
 - P6 (combat) já vem pré-dividido em 6a/6b por ser o maior risco de estourar orçamento; se ainda
   assim ficar grande, divida por comando individual dentro do arquivo do pacote.
 - As decisões em aberto do handover (seção 7) foram resolvidas com defaults no Pacote 0 exatamente
-  para não bloquear o início da implementação — revisitar só no Pacote 10, não antes.
+  para não bloquear o início da implementação, e revisadas com o usuário no Pacote 10 (ver
+  [aventureiro/README.md](../aventureiro/README.md)). Resultado: grid 8x8 confirmado; fórmulas de
+  dano/cura/loot devem seguir o original (`aventureiro.p.bas`, já no repo) em vez de valores livres
+  — Pacote 10 já corrigiu os desvios simples, os que exigem mudar `types.h` foram para o Pacote 12;
+  fuga/perseguição fiel virou o Pacote 13; mapa visual (ASCII, via comando extra) virou o Pacote 14;
+  save/load continua fora de escopo.
