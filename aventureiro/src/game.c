@@ -18,13 +18,8 @@ void game_tela_titulo(void) {
     ui_log(" ");
     ui_log("Você começa com o nível máximo de energia vital e de energia.");
     ui_log(" ");
-    ui_log("Existem 10 comandos:");
-    ui_log("0 Mudar de sala      1 Atacar             2 Fugir");
-    ui_log("3 Trocar de arma     4 Comunicar-se       5 Escudo (lig/des)");
-    ui_log("6 Usar medicamentos  7 Situação           8 Examinar a sala");
-    ui_log("9 Acionar teleporte");
-    ui_log(" ");
-    ui_log("Extra (fora dos 10 comandos originais): H reexibe esta lista de comandos.");
+    ui_log("Existem 10 comandos - a barra na base da tela sempre mostra um resumo deles.");
+    ui_log("Aperte H a qualquer momento pra ver a lista completa, por extenso.");
     ui_log(" ");
     ui_log("Sempre que você utilizar algum dos seus equipamentos (lanterna, escudo");
     ui_log("ou arma) haverá um gasto nas suas reservas de energia. Para terminar o");
@@ -159,9 +154,10 @@ static void mostrar_ajuda(void) {
     ui_log("6 Usar medicamentos  7 Situação           8 Examinar a sala");
     ui_log("9 Acionar teleporte");
     ui_log(" ");
-    ui_log("Extra: H reexibe esta ajuda. O mapa das salas visitadas fica sempre");
-    ui_log("visível no painel à direita. As setas do teclado movem direto na");
-    ui_log("direção, sem precisar digitar 0 antes.");
+    ui_log("Extra: a barra na base da tela mostra esse resumo sempre, sem precisar");
+    ui_log("apertar H de novo. O mapa das salas visitadas fica sempre visível no");
+    ui_log("painel à direita. As setas do teclado movem direto na direção, sem");
+    ui_log("precisar digitar 0 antes.");
 }
 
 FimDeJogo game_loop(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const Config *cfg) {
@@ -186,6 +182,15 @@ FimDeJogo game_loop(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const C
 
         if (comando == -1) {
             mostrar_ajuda(); /* pseudo-comando: nao consome rodada */
+            continue;
+        }
+
+        if (comando == -2) {
+            /* Ctrl-L, Pacote 28: pseudo-comando que nao consome rodada - so
+             * volta ao topo do loop, onde ui_desenhar_hud/ui_desenhar_mapa
+             * ja checam e aplicam resize de terminal (verificar_e_aplicar_
+             * resize em ui.c). Deixa o jogador forcar a sincronizacao da
+             * tela sem esperar o proximo comando de verdade. */
             continue;
         }
 
@@ -260,9 +265,16 @@ FimDeJogo game_loop(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const C
             continue;
         }
 
+        /* Pacote 27: mapa redesenhado antes de narrar - jogador->linha/coluna
+         * ja' foi atualizado pelo comando (movimento/fuga/etc.) nesse ponto,
+         * entao o painel ja mostra a posicao nova enquanto a narracao (com
+         * as pausas dramaticas do Pacote 20) ainda esta rolando, em vez de
+         * so pular pra posicao nova quando a narracao termina. HUD continua
+         * depois de narrar - vida/energia mudam por motivos que a narracao
+         * so explica depois (dano recebido etc.), diferente da posicao. */
+        ui_desenhar_mapa(mapa, jogador);
         narrar(&res);
         ui_desenhar_hud(jogador, bd);
-        ui_desenhar_mapa(mapa, jogador);
 
         /*
          * Perseguicao (Pacote 13): um tripulante fugiu com sucesso da sala
@@ -275,9 +287,9 @@ FimDeJogo game_loop(Jogador *jogador, Mapa *mapa, const BaseDeDados *bd, const C
             int escolha = ler_opcao("SN");
             if (escolha == 0) {
                 Resultado perseguicao = combate_seguir_tripulante_fugido(jogador, mapa, bd, res.trilha_fuga, res.trilha_fuga_tamanho);
+                ui_desenhar_mapa(mapa, jogador); /* Pacote 27: mapa antes de narrar, ver comentario acima */
                 narrar(&perseguicao);
                 ui_desenhar_hud(jogador, bd);
-                ui_desenhar_mapa(mapa, jogador);
             }
         }
 

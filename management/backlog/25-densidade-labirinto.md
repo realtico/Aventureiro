@@ -55,6 +55,18 @@ Jogando manualmente (ou inspecionando o mapa ASCII, Pacote 14/17): sensação de
 interligadas, menos corredores únicos sem alternativa. `tests/smoke_test.py` continua passando
 (gerador de mapa não muda de algoritmo, só o parâmetro).
 
+**Resolvido e confirmado.** Adotada a solução simples (só `config.json`, sem mudar o algoritmo).
+Jogando manualmente com valores diferentes de `chance_porta_extra_labirinto`: **60% já pareceu
+demais** — o mapa perde a sensação de labirinto, fica aberto demais/sem corredores únicos de
+verdade. Optou-se por **50%** em vez do 70% originalmente calculado como "mais próximo do alvo
+matemático de ~3 portas/sala" — a sensação de jogo (60% já excessivo) pesou mais que a conta em
+teoria, e 50% ficou no meio do caminho entre o original 15% (muito labirinto/pouca sala) e o 60%
+testado (muito aberto). Pela tabela já calculada acima: 50% dá ≈88 portas totais, ≈2,73 portas/sala
+(ante ≈2,20 em 15%). `data/config.json`: `chances_percentual.porta_extra_labirinto` alterado de 15
+para **50**. Sem mudança em `map.c` — `esculpir_labirinto()`/`adicionar_portas_extras()`/
+`mapa_totalmente_conectado()` continuam iguais, só o parâmetro de entrada muda; reversível trocando o
+número de volta a qualquer momento.
+
 ## Alternativa não escolhida, registrada para o futuro
 
 Trocar o algoritmo inteiro por sorteio independente de porta por par de salas vizinhas (mais perto

@@ -34,3 +34,16 @@ Jogando manualmente: ao mover pra uma sala nova, o painel de mapa já mostra o `
 **antes** da primeira linha de narração da sala aparecer (não só depois que a narração termina).
 Comandos que não mudam de sala (Atacar, Situação, etc.) continuam com a mesma aparência de hoje
 (mapa não muda, então a ordem é imperceptível). `tests/smoke_test.py` continua passando.
+
+**Resolvido e confirmado.** Implementado exatamente como planejado: em `game_loop`
+([game.c:266](../../aventureiro/src/game.c#L266)), `ui_desenhar_mapa(mapa, jogador)` movido pra antes
+de `narrar(&res)`; `ui_desenhar_hud` continua depois. Mesmo ajuste no trecho de perseguição
+([game.c:281](../../aventureiro/src/game.c#L281)). Nenhuma lógica condicional por comando foi
+necessária, como previsto.
+
+Verificação visual (pexpect+pyte, seed 33, **sem** `AVENTUREIRO_SEM_PAUSAS` pra deixar a pausa
+dramática de ~1s acontecer de verdade): capturada a tela bem no meio da narração, logo após "Há
+alguém..." aparecer e **antes** da pausa entre falas terminar — o painel de mapa já mostrava `@` na
+sala nova (uma porta ao Norte da Sala de Teleporte) nesse instante, confirmando que o salto de
+posição não espera mais a narração terminar. `tests/smoke_test.py` (`ctest`/`smoke_test.py`) rodado
+3x seguidas sem falha depois da mudança.

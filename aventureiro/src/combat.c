@@ -168,16 +168,26 @@ static void narrar_sala(const Mapa *mapa, const BaseDeDados *bd, int linha, int 
         /* Linha 6270 do original: a arma do tripulante ja e' revelada na
          * apresentacao, antes de qualquer ataque ("...ARMADO COM [arma]..."). */
         const Arma *arma = &bd->armas[tripulante->id_arma];
-        /* Pacote 20: 3 falas espacadas por pausa, igual as linhas
-         * 6150/6210/6270 do original (a revelacao final e' atribuida a
-         * "TWIN", o tradutor/conselheiro eletronico apresentado na tela de
-         * titulo - nao narracao impessoal). */
+        /* Pacote 20: as duas primeiras falas ("Ha alguem...", "Ha alguma
+         * coisa aqui...") tem pausa dramatica entre elas, igual as linhas
+         * 6150/6210 do original - constroem a tensao antes da revelacao.
+         * Pacote 29: a revelacao em si (rotulo "TWIN reporta..." + nome/arma
+         * + frase, linha 6270 do original, atribuida ao "TWIN", o
+         * tradutor/conselheiro eletronico da tela de titulo) precisou virar
+         * 3 mensagens em vez de uma só - juntas numa unica chamada de
+         * log_msg, nome+arma+frase podiam passar dos 96 bytes de
+         * MAX_TAMANHO_MENSAGEM (confirmado com os dados reais de
+         * crew.json/weapons.json) e vsnprintf cortava o fim da mensagem
+         * silenciosamente. Mas as 3 saem sem pausa entre si - a tensao ja
+         * foi construida pelas duas falas anteriores, e mais pausa aqui so'
+         * deixaria a revelacao lenta sem ganhar nada em ritmo. */
         log_msg(r, "Há alguém...");
         marcar_pausa(r);
         log_msg(r, "Há alguma coisa aqui...");
         marcar_pausa(r);
-        log_msg(r, "TWIN reporta... \"É um %s, armado com %s. %s.\"", tripulante->nome, arma->nome,
-                tripulante->frase);
+        log_msg(r, "TWIN reporta...");
+        log_msg(r, "É um %s, armado com %s.", tripulante->nome, arma->nome);
+        log_msg(r, "%s", tripulante->frase);
     } else {
         log_msg(r, "Não há ninguém aqui.");
     }

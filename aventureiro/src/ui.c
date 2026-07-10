@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 /*
  * Altura fixa do HUD (linhas do topo). O log ocupa o resto da tela, numa
@@ -23,12 +25,69 @@
  */
 #define LARGURA_MINIMA_LOG 40
 
+/* Altura fixa da barra de comandos permanente (Pacote 26) - uma linha simples
+ * na base da tela, sem moldura (desenhar_moldura precisa de pelo menos 2
+ * linhas pra ter borda superior/inferior). */
+#define ALTURA_BARRA 1
+
 static WINDOW *janela_hud = NULL;
 static WINDOW *janela_log = NULL;
 /* Painel de mapa permanente (Pacote 17). NULL se o terminal for pequeno
  * demais pra caber (ver ui_iniciar) - ui_desenhar_mapa() checa isso e vira
  * no-op nesse caso, o resto do jogo funciona normalmente sem o painel. */
 static WINDOW *janela_mapa = NULL;
+/* Barra de comandos permanente (Pacote 26). NULL se o terminal for pequeno
+ * demais pra caber nenhuma das 3 variantes de texto (ver escolher_texto_barra
+ * e ui_iniciar) - mesma filosofia do painel de mapa, vira no-op silencioso. */
+static WINDOW *janela_barra = NULL;
+
+/* Pacote 28: tamanho do mapa guardado pra poder recriar as janelas depois de
+ * um resize (verificar_e_aplicar_resize), sem precisar mudar a assinatura de
+ * ui_iniciar. ultima_altura/ultima_largura comecam em -1 (nunca visto ainda)
+ * so' pra garantir que o primeiro ioctl encontre "mudou", mas na pratica
+ * ui_iniciar ja os inicializa com o tamanho real antes de qualquer redraw. */
+static int mapa_tamanho_atual = 0;
+static int ultima_altura = -1;
+static int ultima_largura = -1;
+
+/*
+ * 3 niveis de detalhe pra barra de comandos, do mais legivel pro mais
+ * compacto - escolhido conforme a largura do terminal (ui_iniciar), mesmo
+ * espirito do painel de mapa (Pacote 17) que soma/some conforme o espaco.
+ * BARRA_COMPLETA tem 90 colunas visiveis - mais que os 80 classicos, entao
+ * cai pra BARRA_ABREVIADA (49 colunas) em terminais mais estreitos.
+ */
+static const char *BARRA_COMPLETA =
+    "0:Mover 1:Atacar 2:Fugir 3:Arma 4:Falar 5:Escudo 6:Remédio 7:Status 8:Examinar 9:Teleporte";
+static const char *BARRA_ABREVIADA =
+    "0-Mv 1-At 2-Fg 3-Ar 4-Fl 5-Es 6-Rm 7-St 8-Ex 9-Tp (H=ajuda)";
+static const char *BARRA_MINIMA = "0123456789 (H=ajuda)";
+
+/* Conta colunas visiveis, nao bytes - acentos UTF-8 (ex. "Remédio") ocupam 2
+ * bytes mas 1 coluna; contar bytes superestimaria a largura e rejeitaria uma
+ * variante que caberia perfeitamente na tela. */
+static int largura_visivel_utf8(const char *s) {
+    int n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p != '\0'; p++) {
+        if ((*p & 0xC0) != 0x80) {
+            n++;
+        }
+    }
+    return n;
+}
+
+static const char *escolher_texto_barra(int largura_disponivel) {
+    if (largura_visivel_utf8(BARRA_COMPLETA) <= largura_disponivel) {
+        return BARRA_COMPLETA;
+    }
+    if (largura_visivel_utf8(BARRA_ABREVIADA) <= largura_disponivel) {
+        return BARRA_ABREVIADA;
+    }
+    if (largura_visivel_utf8(BARRA_MINIMA) <= largura_disponivel) {
+        return BARRA_MINIMA;
+    }
+    return NULL; /* terminal estreito demais pra qualquer variante */
+}
 
 /*
  * Pacote 16: setlocale(LC_ALL, "") so' resolve pra UTF-8 se o AMBIENTE ja'
@@ -62,19 +121,33 @@ static void garantir_locale_utf8(void) {
     setlocale(LC_ALL, "C.UTF-8");
 }
 
-void ui_iniciar(int tamanho_mapa) {
-    /*
-     * garantir_locale_utf8() cobre a metade "locale" do bug do Pacote 16
-     * (ver comentario acima da funcao). A outra metade - libncurses
-     * "narrow" vs "wide" - e' resolvida no CMakeLists.txt (link contra
-     * ncursesw), nao aqui.
-     */
-    garantir_locale_utf8();
-    initscr();
-    cbreak();     /* le tecla sem esperar Enter, mas deixa Ctrl-C funcionando (raw() desligaria isso) */
-    noecho();     /* nao ecoa a tecla digitada - o jogo controla o que aparece na tela */
-    keypad(stdscr, TRUE);
-    curs_set(0);  /* sem cursor piscando - nao ha campo de texto livre, so leitura de digito */
+static void destruir_janelas(void) {
+    if (janela_hud != NULL) {
+        delwin(janela_hud);
+        janela_hud = NULL;
+    }
+    if (janela_log != NULL) {
+        delwin(janela_log);
+        janela_log = NULL;
+    }
+    if (janela_mapa != NULL) {
+        delwin(janela_mapa);
+        janela_mapa = NULL;
+    }
+    if (janela_barra != NULL) {
+        delwin(janela_barra);
+        janela_barra = NULL;
+    }
+}
+
+/*
+ * Cria (ou recria, apos um resize - Pacote 28) as 4 janelas com base no
+ * COLS/LINES atuais do ncurses. Extraida de ui_iniciar pra ser reaproveitada
+ * por verificar_e_aplicar_resize sem duplicar a logica de layout.
+ */
+static void recriar_janelas(int tamanho_mapa) {
+    destruir_janelas();
+    mapa_tamanho_atual = tamanho_mapa;
 
     janela_hud = newwin(ALTURA_HUD, COLS, 0, 0);
 
@@ -92,33 +165,85 @@ void ui_iniciar(int tamanho_mapa) {
     int largura_painel = largura_grid + 4;   /* borda (2) + respiro (2) */
     int altura_painel = altura_grid + 4;     /* borda (2) + titulo (1) + respiro (1) */
 
+    /*
+     * Barra de comandos (Pacote 26): reserva 1 linha na base da tela, se
+     * houver alguma das 3 variantes de texto que caiba na largura e ainda
+     * sobrar pelo menos 1 linha pro log depois de descontar HUD+barra. Nao
+     * corrompe a tela em terminal pequeno demais - so' deixa de aparecer,
+     * mesma filosofia do painel de mapa logo abaixo.
+     */
+    const char *texto_barra = escolher_texto_barra(COLS);
+    bool cabe_barra = texto_barra != NULL && (LINES - ALTURA_HUD - ALTURA_BARRA) >= 1;
+    int altura_reservada_barra = cabe_barra ? ALTURA_BARRA : 0;
+    int altura_disponivel = LINES - ALTURA_HUD - altura_reservada_barra;
+
     bool cabe_painel = tamanho_mapa > 0 &&
         (COLS - largura_painel) >= LARGURA_MINIMA_LOG &&
-        (LINES - ALTURA_HUD) >= altura_painel;
+        altura_disponivel >= altura_painel;
 
     int largura_log = cabe_painel ? (COLS - largura_painel) : COLS;
-    janela_log = newwin(LINES - ALTURA_HUD, largura_log, ALTURA_HUD, 0);
+    janela_log = newwin(altura_disponivel, largura_log, ALTURA_HUD, 0);
     scrollok(janela_log, TRUE);
     keypad(janela_log, TRUE);
 
     if (cabe_painel) {
-        janela_mapa = newwin(LINES - ALTURA_HUD, largura_painel, ALTURA_HUD, largura_log);
+        janela_mapa = newwin(altura_disponivel, largura_painel, ALTURA_HUD, largura_log);
+    }
+
+    if (cabe_barra) {
+        janela_barra = newwin(ALTURA_BARRA, COLS, LINES - ALTURA_BARRA, 0);
+        mvwprintw(janela_barra, 0, 0, "%s", texto_barra);
+        wrefresh(janela_barra);
     }
 }
 
+/*
+ * Pacote 28: o SIGWINCH do ncurses so' atualiza LINES/COLS na proxima
+ * chamada de wgetch() (nao no instante do sinal em si, ver handover) - por
+ * isso le o tamanho REAL do terminal direto via ioctl(TIOCGWINSZ), sem
+ * depender do LINES/COLS do ncurses, que podem estar desatualizados nesse
+ * meio-tempo. Chamada no inicio dos redraws (ui_desenhar_hud/
+ * ui_desenhar_mapa), que ja rodam sem condicao a cada turno (Pacote
+ * 17/26) - se o tamanho real mudou desde a ultima vez, sincroniza o ncurses
+ * (resizeterm) e recria as 4 janelas com o layout novo. Descarta o
+ * scrollback do log acumulado (nao ha como "reimprimir" o que ja rolou) -
+ * aceitavel aqui, o log ja e' limpo a cada comando mesmo (ui_limpar_log).
+ */
+static void verificar_e_aplicar_resize(void) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1) {
+        return;
+    }
+    if (ws.ws_row == ultima_altura && ws.ws_col == ultima_largura) {
+        return;
+    }
+    resizeterm(ws.ws_row, ws.ws_col);
+    ultima_altura = ws.ws_row;
+    ultima_largura = ws.ws_col;
+    recriar_janelas(mapa_tamanho_atual);
+}
+
+void ui_iniciar(int tamanho_mapa) {
+    /*
+     * garantir_locale_utf8() cobre a metade "locale" do bug do Pacote 16
+     * (ver comentario acima da funcao). A outra metade - libncurses
+     * "narrow" vs "wide" - e' resolvida no CMakeLists.txt (link contra
+     * ncursesw), nao aqui.
+     */
+    garantir_locale_utf8();
+    initscr();
+    cbreak();     /* le tecla sem esperar Enter, mas deixa Ctrl-C funcionando (raw() desligaria isso) */
+    noecho();     /* nao ecoa a tecla digitada - o jogo controla o que aparece na tela */
+    keypad(stdscr, TRUE);
+    curs_set(0);  /* sem cursor piscando - nao ha campo de texto livre, so leitura de digito */
+
+    ultima_altura = LINES;
+    ultima_largura = COLS;
+    recriar_janelas(tamanho_mapa);
+}
+
 void ui_encerrar(void) {
-    if (janela_hud != NULL) {
-        delwin(janela_hud);
-        janela_hud = NULL;
-    }
-    if (janela_log != NULL) {
-        delwin(janela_log);
-        janela_log = NULL;
-    }
-    if (janela_mapa != NULL) {
-        delwin(janela_mapa);
-        janela_mapa = NULL;
-    }
+    destruir_janelas();
     endwin();
 }
 
@@ -185,6 +310,8 @@ static void desenhar_moldura(WINDOW *win) {
 }
 
 void ui_desenhar_hud(const Jogador *jogador, const BaseDeDados *bd) {
+    verificar_e_aplicar_resize();
+
     werase(janela_hud);
     desenhar_moldura(janela_hud);
 
@@ -212,6 +339,11 @@ int ui_ler_comando(void) {
         tecla = wgetch(janela_log);
         if (tecla == 'h' || tecla == 'H') {
             return -1; /* pseudo-comando de ajuda, Pacote 11 */
+        }
+        if (tecla == '\f') { /* Ctrl-L, Pacote 28: convencao classica de terminal pra
+                               * "redesenhar tela" - forca a checagem de resize do
+                               * topo do loop sem esperar o proximo comando real. */
+            return -2;
         }
         /*
          * Atalho de movimento por seta (Pacote 18): equivalente a "0" + a
@@ -258,6 +390,8 @@ int ui_ler_numero(void) {
 }
 
 void ui_desenhar_mapa(const Mapa *mapa, const Jogador *jogador) {
+    verificar_e_aplicar_resize();
+
     if (janela_mapa == NULL) {
         return; /* terminal pequeno demais pro painel - ver ui_iniciar */
     }

@@ -42,3 +42,45 @@ Jogando manualmente: a barra de comandos aparece sempre na última linha, com pa
 (não frases completas), sem precisar apertar `H`. HUD, log e painel de mapa continuam funcionando
 normalmente acima dela. Terminal pequeno demais tem comportamento definido (não corrompe a tela).
 `tests/smoke_test.py` atualizado e passando.
+
+**Resolvido e confirmado.** Decisões tomadas com o usuário: estilo de conteúdo = palavra curta
+(`0:Mover 1:Atacar ...`, 90 colunas visíveis); comando `H` mantido (fala completa, complementando a
+barra em vez de duplicá-la).
+
+Implementado:
+
+- `ui.c`: nova `WINDOW *janela_barra`, 1 linha fixa na base (`ALTURA_BARRA`), sem moldura (uma linha
+  não comporta borda superior+inferior de `desenhar_moldura`). 3 variantes de texto em cascata
+  (`escolher_texto_barra`), da mais legível pra mais compacta, escolhida pela largura do terminal:
+  `BARRA_COMPLETA` (90 colunas, "0:Mover 1:Atacar ..."), `BARRA_ABREVIADA` (59 colunas, "0-Mv 1-At ...
+  (H=ajuda)"), `BARRA_MINIMA` (20 colunas, "0123456789 (H=ajuda)"). Nenhuma cabendo, a barra vira
+  `NULL`/no-op silencioso, mesma filosofia do painel de mapa (Pacote 17). A largura de cada variante é
+  contada em **colunas visíveis, não bytes** (`largura_visivel_utf8`) — "Remédio" tem acento (2 bytes,
+  1 coluna), contar bytes superestimaria a largura e rejeitaria uma variante que caberia.
+  `janela_log`/`janela_mapa` (`ui_iniciar`) descontam a altura da barra do espaço disponível, do
+  mesmo jeito que o painel de mapa já desconta largura do log. Conteúdo é estático (nunca muda
+  durante a partida), então é escrito uma vez em `ui_iniciar`, sem precisar de uma função de redesenho
+  chamada a cada turno.
+- `game.c`: `H` mantido (`mostrar_ajuda()`), só ganhou uma linha extra mencionando que a barra
+  permanente já cobre o resumo. Tela de título (`game_tela_titulo()`) simplificada — não repete mais
+  a lista de 10 comandos por extenso (isso já está sempre visível na barra), só menciona a barra e o
+  `H`.
+- `tests/smoke_test.py`: nova `verificar_barra_comandos_visivel` confirma que a barra aparece sem
+  apertar nada, igual `verificar_painel_mapa_visivel` fez pro mapa (Pacote 17). Verificado manualmente
+  (fora do smoke test, que roda fixo em 100 colunas) que a variante abreviada aparece em 70 colunas e
+  a barra desaparece de forma limpa em 15 colunas.
+- **Achado incidental, corrigido**: rodando a suíte pra validar essa mudança, `verificar_atalho_setas`
+  (Pacote 18) quebrou — mas por um motivo **pré-existente, não relacionado a este pacote** (confirmado
+  reproduzindo o mesmo erro num worktree do último commit, sem nenhuma mudança deste pacote nem do
+  25): `comando_mover` recusa mover em **qualquer** direção se houver tripulante vivo na sala atual
+  (`combat.c:369-374`, fidelidade ao original — "não dê as costas"), e o teste de setas só prevía 2
+  desfechos (moveu, ou "não há saída"), sem esse terceiro caso. Com seed fixa (1), a primeira seta
+  entra numa sala com tripulante vivo, e as demais então caem nesse terceiro caso. Corrigido: teste
+  aceita as 3 mensagens válidas de `comando_mover`; e como uma seta repetindo o mesmo aviso produz uma
+  tela **byte-idêntica** à anterior (não dá pra esperar por "mudou"), a checagem de resposta virou um
+  dreno de tempo fixo (`drenar_por`) em vez de comparação de conteúdo.
+
+Verificação: build limpo via CMake (`-Wall -Wextra -Werror`, sem warnings). `ctest`/`smoke_test.py`
+rodado 4x seguidas sem falha (painel de mapa, barra de comandos, setas, e ~240-260 comandos de fuzz
+por rodada). Confirmado visualmente com pexpect+pyte em 100x30 (barra completa), 70x24 (barra
+abreviada) e 15x24 (barra ausente, tela não corrompe).
