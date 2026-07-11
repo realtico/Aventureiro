@@ -112,6 +112,14 @@ typedef struct {
      * nao revelar tipo/conteudo de salas nunca visitadas. O original nao
      * tinha isso (100% textual, sem visualizacao de mapa). */
     bool visitada;
+
+    /* Pacote 33: true assim que o comando 8 (examinar sala) e' usado com
+     * sucesso nesta sala, tenha achado item ou nao - distinto de
+     * item_coletado (so' fica true se havia item a coletar). Usado pelo
+     * mapa ASCII (ui.c) pra marcar a sala como "ja vasculhada", servindo de
+     * trilha de migalhas: uma sala 'visitada' mas nao 'examinada' e' uma
+     * sala por onde o jogador so' passou/fugiu, sem parar pra procurar. */
+    bool examinada;
 } Celula;
 
 /* O labirinto inteiro: grid_size x grid_size celulas, regenerado a cada partida. */

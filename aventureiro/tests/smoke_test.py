@@ -275,6 +275,53 @@ def verificar_fala_tripulante_nao_trunca(binario):
     print("OK: fala do TWIN aparece completa, sem truncar, no pior caso conhecido (Pacote 29).")
 
 
+def verificar_sala_sem_item_examinada_marca_x(binario):
+    """
+    Verifica com pyte (Pacote 33) que examinar uma sala sem item (comando 8,
+    resultado "Nada.") marca a sala como examinada no mapa ASCII (×) - antes
+    dessa correcao, o campo usado pro simbolo era item_coletado (combat.c),
+    que so' ficava true se a sala tivesse item pra coletar; uma sala vazia
+    examinada nunca ganhava marca nenhuma, ficando indistinguivel de uma sala
+    so' visitada de passagem (ou fugida) sem nunca ter sido vasculhada.
+
+    Usa o seed 6: a sala a 1 porta (Norte) da Sala de Teleporte nao tem item
+    (confirmado via "Nada." apos o comando 8) - achado por busca manual entre
+    poucos seeds, sem precisar de BFS offline (ver Pacote 29 pra esse tipo de
+    busca quando um caso especifico for necessario de novo). Se o gerador de
+    mapa ou as chances de item em data/config.json mudarem, o seed pode
+    deixar de servir - trocar por outro que reproduza uma sala sem item logo
+    no inicio.
+    """
+    child, conteudo_atual, esperar, drenar_por, redimensionar = _sessao_com_tela(binario, seed=6)
+
+    esperar(lambda: "Boa sorte" in conteudo_atual(), "tela de titulo nunca terminou de aparecer")
+    child.send(" ")
+    esperar(lambda: "você" in conteudo_atual() and "teleporte" in conteudo_atual(),
+            "painel de mapa nao apareceu antes do teste de sala sem item")
+
+    contagem_antes = conteudo_atual().count("×")
+
+    child.send("\x1bOA")  # seta cima = Norte - sala sem item (seed 6)
+    esperar(lambda: "Você entrou numa nova sala." in conteudo_atual(), "nao entrou na sala ao Norte")
+    child.send("8")
+    esperar(lambda: "Nada." in conteudo_atual(), "exame da sala sem item nunca respondeu 'Nada.'")
+
+    child.send("\x1bOB")  # seta baixo = Sul, volta pra Sala de Teleporte
+    esperar(lambda: "Você entrou numa nova sala." in conteudo_atual(), "nao voltou pra Sala de Teleporte")
+    drenar_por(0.3)
+
+    tela = conteudo_atual()
+    contagem_depois = tela.count("×")
+    if contagem_depois <= contagem_antes:
+        print(f"FALHA: sala sem item examinada nao ganhou marca × no mapa "
+              f"(antes={contagem_antes}, depois={contagem_depois}):\n{tela}", file=sys.stderr)
+        child.close(force=True)
+        sys.exit(1)
+
+    child.close(force=True)
+    print("OK: sala sem item marca × no mapa depois de examinada com o comando 8 (Pacote 33).")
+
+
 def verificar_resize_realinha_painel(binario):
     """
     Verifica com pyte (Pacote 28) que redimensionar o terminal em runtime -
@@ -692,6 +739,7 @@ def main():
     verificar_painel_mapa_visivel(binario)
     verificar_barra_comandos_visivel(binario)
     verificar_fala_tripulante_nao_trunca(binario)
+    verificar_sala_sem_item_examinada_marca_x(binario)
     verificar_resize_realinha_painel(binario)
     verificar_atalho_setas(binario)
     verificar_hud_estreito_nao_corrompe(binario)

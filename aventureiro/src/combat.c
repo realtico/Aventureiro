@@ -477,13 +477,22 @@ Resultado comando_examinar_sala(Jogador *jogador, Mapa *mapa, const Config *cfg,
         return r;
     }
 
+    if (celula->escura && usar_lanterna && jogador->energia < CUSTO_ENERGIA_LANTERNA) {
+        log_msg(&r, "Energia insuficiente para usar a lanterna.");
+        r.sucesso = false;
+        return r;
+    }
+
+    /* Pacote 33: a partir daqui o exame de fato acontece (achando item ou
+     * não, sala clara ou escura) - marca a sala como examinada pro mapa
+     * ASCII (ui.c), distinto de item_coletado (que só fica true se havia
+     * item a coletar). Fica antes do bloco de escura/lanterna abaixo de
+     * propósito: mesmo o acidente no escuro (que pode matar o jogador) só
+     * acontece depois de já ter se comprometido a vasculhar a sala. */
+    celula->examinada = true;
+
     if (celula->escura) {
         if (usar_lanterna) {
-            if (jogador->energia < CUSTO_ENERGIA_LANTERNA) {
-                log_msg(&r, "Energia insuficiente para usar a lanterna.");
-                r.sucesso = false;
-                return r;
-            }
             jogador->energia -= CUSTO_ENERGIA_LANTERNA;
             log_msg(&r, "Usando a lanterna, você examina a sala.");
         } else {

@@ -620,13 +620,18 @@ static void desenhar_grid_mapa(WINDOW *win, int linha_inicial, const Mapa *mapa,
                 salas[pos++] = '@';
             } else if (eh_teleporte) {
                 salas[pos++] = 'o'; /* pad do teleporte - sempre visitada, e' o inicio da partida */
-            } else if (celula->item_coletado) {
-                /* × (U+00D7 MULTIPLICATION SIGN, Pacote 30 sidetrack) - sala
-                 * visitada cujo item ja foi coletado (celula->item_coletado,
-                 * ver combat.c:525). Centralizado no quadrado do caractere,
-                 * diferente da letra latina "x" - se nao ficar distinto o
-                 * bastante de "@" numa fonte de terminal especifica,
-                 * alternativa e' ✕ (U+2715). */
+            } else if (celula->examinada) {
+                /* × (U+00D7 MULTIPLICATION SIGN, Pacote 30 sidetrack;
+                 * criterio trocado no Pacote 33) - sala ja vasculhada com o
+                 * comando 8 (celula->examinada, ver combat.c), tenha achado
+                 * item ou nao. Antes so' marcava com item_coletado (so'
+                 * salas com item ja pego) - sala sem item nunca ganhava a
+                 * marca mesmo depois de examinada, e nao dava pra saber se
+                 * uma sala 'visitada' foi vasculhada ou so' fugida. Agora
+                 * serve de trilha de migalhas independente de haver item.
+                 * Centralizado no quadrado do caractere, diferente da letra
+                 * latina "x" - se nao ficar distinto o bastante de "@" numa
+                 * fonte de terminal especifica, alternativa e' ✕ (U+2715). */
                 memcpy(&salas[pos], "×", 2);
                 pos += 2;
             } else if (celula->visitada) {
@@ -672,7 +677,7 @@ static void desenhar_grid_mapa(WINDOW *win, int linha_inicial, const Mapa *mapa,
         mvwprintw(win, linha_janela + 1, 2, "@ você");
         mvwprintw(win, linha_janela + 2, 2, "o teleporte");
         mvwprintw(win, linha_janela + 3, 2, "· visitada");
-        mvwprintw(win, linha_janela + 4, 2, "× item coletado");
+        mvwprintw(win, linha_janela + 4, 2, "× examinada");
     }
 }
 
