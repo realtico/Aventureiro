@@ -15,8 +15,8 @@
 
   "chances_percentual": {
     "_comment": "Probabilidades (0-100) usadas pelo gerador de mapa e por combat.c durante a exploracao.",
-    "tripulante_na_sala": 60,
-    "item_na_sala": 30,
+    "tripulante_na_sala": 66,
+    "item_na_sala": 60,
     "sala_escura": 20,
     "acidente_no_escuro": 25,
     "porta_extra_labirinto": 50
