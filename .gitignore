@@ -20,3 +20,6 @@ bin/
 .DS_Store
 Thumbs.db
 __pycache__/
+
+# Claude Code (config local, específica da máquina)
+.claude/settings.local.json
