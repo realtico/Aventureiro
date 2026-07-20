@@ -70,6 +70,7 @@ P0 (scaffold) → P1 (dados JSON) → P2 (types/util) → P3 (data_loader)
 | 25 | [backlog/25-densidade-labirinto.md](backlog/25-densidade-labirinto.md) | S | P4 | [ ] |
 | 26 | [backlog/26-barra-comandos.md](backlog/26-barra-comandos.md) | M | P11, P17 | [ ] |
 | 27 | [backlog/27-mapa-antes-da-descricao.md](backlog/27-mapa-antes-da-descricao.md) | S | P17, P20 | [ ] |
+| 34 | [backlog/34-troca-arma-10-nao-selecionavel.md](backlog/34-troca-arma-10-nao-selecionavel.md) | S | P8 | [x] |
 
 ## Depois do backlog
 

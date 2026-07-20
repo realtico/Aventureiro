@@ -94,7 +94,7 @@ static Resultado comando_trocar_arma_interativo(Jogador *jogador, const BaseDeDa
         ui_log("%d. %s", i + 1, arma->nome);
     }
     ui_log("Que arma quer usar (1 a %d)?", jogador->num_armas_obtidas);
-    int escolha = ui_ler_comando();
+    int escolha = ui_ler_numero();
     return comando_trocar_arma(jogador, bd, escolha - 1);
 }
 
